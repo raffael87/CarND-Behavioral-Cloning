@@ -16,6 +16,8 @@ from keras.models import load_model
 import h5py
 from keras import __version__ as keras_version
 
+import cv2
+
 sio = socketio.Server()
 app = Flask(__name__)
 model = None
@@ -47,6 +49,17 @@ controller = SimplePIController(0.1, 0.002)
 set_speed = 9
 controller.set_desired(set_speed)
 
+def get_image(image):
+    
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # remove sky and hood of the car
+    image = image[35:135,:,:] # 35px from top 25 px from bottom
+    
+    # resize to nvidias neural network
+    image = cv2.resize(image, (200, 66), interpolation = cv2.INTER_AREA)
+    
+    return image
 
 @sio.on('telemetry')
 def telemetry(sid, data):
@@ -61,6 +74,7 @@ def telemetry(sid, data):
         imgString = data["image"]
         image = Image.open(BytesIO(base64.b64decode(imgString)))
         image_array = np.asarray(image)
+        image_array = get_image(image_array)
         steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
 
         throttle = controller.update(float(speed))
